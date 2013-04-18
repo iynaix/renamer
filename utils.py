@@ -85,6 +85,8 @@ def rename(fp, dry_run=False):
     res = ANIME_RE.search(renamed)
     if res:
         renamed = re.sub(BRACKET_RE, '', renamed).strip("_ ")
+        #drop the version numbers if they exist
+        renamed = re.sub(r"(\d+)[vV]\d+", r"\1", renamed)
         renamed = renamed.replace("_", " ").replace(" - ", " ")
 
     #is it a youtube video?
