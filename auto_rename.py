@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 
+import guessit
 from docopt import docopt
 from path import path
 from utils import notification, move_file, rename, add_subtitles_mkv
@@ -26,6 +27,9 @@ def move_300mbunited(dry_run=False):
     the movies folder
     """
     for d in DOWNLOAD_DIR.dirs():
+        if d.name.startswith("_FAILED"):
+            continue
+
         #look for any movie directories
         if "300mbunited" in d.lower():
             #look for the mkvs
@@ -38,6 +42,36 @@ def move_300mbunited(dry_run=False):
             #remove the directory
             if not dry_run:
                 d.rmtree()
+
+
+def move_tv_episodes(dry_run=False):
+    """
+    handle tv episodes downloaded by sabnzbd
+    """
+    episode_dirs = []
+    for d in DOWNLOAD_DIR.dirs():
+        if d.name.startswith("_FAILED"):
+            continue
+
+        #need to fake an extension
+        info = guessit.guess_video_info(str(d)+".avi")
+        if info["type"] != "episode":
+            continue
+        episode_dirs.append(d)
+
+    for d in episode_dirs:
+        #look for the largest file
+        vid = sorted(d.files(), key=lambda f: f.size)[-1]
+
+        info = guessit.guess_video_info(str(vid))
+        fname = "%(series)s S%(season)02dE%(episodeNumber)02d" % info
+        fp = vid.rename("%s%s" % (fname, vid.ext))
+        move_file(fp, HOME_DIR("Videos/TO WATCH"), dry_run)
+
+    for d in episode_dirs:
+        #remove the directory
+        if not dry_run:
+            d.rmtree()
 
 
 if __name__ == "__main__":
@@ -69,6 +103,9 @@ if __name__ == "__main__":
 
     #handle movies downloaded from 300mbunited.
     move_300mbunited()
+
+    #handle tv episodes downloaded from 300mbunited.
+    move_tv_episodes()
 
     #folders where the files will be renamed
     RENAME_DIRS = [

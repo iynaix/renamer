@@ -3,14 +3,14 @@ import re
 import shutil
 import subprocess
 from clint.textui import colored, puts
+import guessit
 
 
 BRACKET_RE = re.compile(r"\[.*?\]")
 ANIME_RE = re.compile(r"%s.*(%s)+$" % (BRACKET_RE.pattern, BRACKET_RE.pattern))
 YOUTUBE_RE = re.compile(r"\(.*?(aac|AAC)\)")
-TV_RE = re.compile(r"\.(hdtv|HDTV|pdtv|PDTV).*")
-MOVIE_RE = re.compile(r"(?P<movie>.*?)\.(?P<year>(19|20)\d\d)")
 VIMEO_RE = re.compile(r"(?P<filename>.*?)(\d{3,})x(\d{3,}).*$")
+MOVIE_RE = re.compile(r"(?P<movie>.*?)\.(?P<year>(19|20)\d\d)")
 
 
 def notification(msg, show=True):
@@ -65,6 +65,36 @@ def split_filter(arr, func):
     return matches , non_matches
 
 
+def rename_anime(renamed):
+    """
+    renames an anime, given the namebase of a file
+    """
+    renamed = re.sub(BRACKET_RE, '', renamed).strip("_ ")
+    #drop the version numbers if they exist
+    renamed = re.sub(r"(\d+)[vV]\d+", r"\1", renamed)
+    return renamed.replace("_", " ").replace(" - ", " ")
+
+
+def rename_episode(renamed):
+    """
+    renames a tv episode, given the namebase of a file
+    """
+    info = guessit.guess_video_info("%s.avi" % (renamed))
+
+    if info["type"] != "episode":
+        return renamed
+
+    #not a tv series, even though it might look like one
+    series_exceptions = ["techsnap"]
+    if info["series"].lower() in series_exceptions:
+        return renamed
+
+    #probably a youtube / vimeo video
+    if "episodeNumber" not in info or "series" not in info:
+        return renamed
+    return "%(series)s S%(season)02dE%(episodeNumber)02d" % info
+
+
 def rename(fp, dry_run=False):
     """
     renames the file intelligently
@@ -78,65 +108,49 @@ def rename(fp, dry_run=False):
         return
 
     name = fp.namebase
-    renamed = name.strip()
-    renamed = renamed.replace("!", '').strip("_ ").strip(".")
+    renamed = name.strip().replace("!", '').strip("_ ").strip(".")
 
     #is it an anime?
-    res = ANIME_RE.search(renamed)
-    if res:
-        renamed = re.sub(BRACKET_RE, '', renamed).strip("_ ")
-        #drop the version numbers if they exist
-        renamed = re.sub(r"(\d+)[vV]\d+", r"\1", renamed)
-        renamed = renamed.replace("_", " ").replace(" - ", " ")
+    if ANIME_RE.search(renamed):
+        renamed = rename_anime(renamed)
+    else:
+        renamed = rename_episode(renamed)
 
     #is it a youtube video?
     res = YOUTUBE_RE.search(renamed)
     if res:
         renamed = re.sub(YOUTUBE_RE, '', renamed).strip("_ ")
         renamed = re.sub(r"(\S)_\s", r"\1 - ", renamed)
+        renamed = re.sub(r"\b_", '', renamed)
 
-    #is it a viemo video?
+    #is it a vimeo video?
     res = VIMEO_RE.search(renamed)
     if res:
         renamed = res.groupdict()["filename"].strip("_")
         renamed = renamed.replace("_", " ")
 
-    #is it a movie downloaded from the web?
-    res = MOVIE_RE.search(renamed)
-    if res:
-        renamed = res.groupdict()['movie']
-        renamed = renamed.replace(".", " ")
-
-    #is it a tv series download from the web?
-    res = TV_RE.search(renamed)
-    if res:
-        renamed = re.sub(TV_RE, '', renamed).strip("_ ")
-        renamed = renamed.replace(".", " ")
-        tmp = renamed.split()
-        renamed = ' '.join(x.title() for x in tmp[:-1])
-
-        #handle the episodes
-        episode = tmp[-1].upper()
-        if not re.match(r"^S\d+E\d+$", episode):
-            if re.match(r"^\d+$", episode):
-                episode = "S%02dE%02d" % (int(episode[:-2]), int(episode[-2:]))
-        renamed = '%s %s' % (renamed, episode)
+    # #is it a movie downloaded from the web?
+    # res = MOVIE_RE.search(renamed)
+    # if res:
+    #     renamed = res.groupdict()['movie']
+    #     renamed = renamed.replace(".", " ")
 
     #title case!
     renamed = smart_title(renamed)
 
-    #super specific replacements
-    renamed = renamed.replace("Greys Anatomy", "Grey's Anatomy")
-    renamed = renamed.replace("Chihayafuru 2", "Chihayafuru S2")
+    # #super specific replacements
+    # renamed = renamed.replace("Greys Anatomy", "Grey's Anatomy")
+    # renamed = renamed.replace("Chihayafuru 2", "Chihayafuru S2")
 
     #print and rename output if unchanged
+    target = fp.dirname().joinpath(renamed + ext)
     if renamed != name:
         print "%s => " % name,
         puts(colored.green(renamed))
-        target = fp.dirname().joinpath(renamed + ext)
         if not dry_run:
             fp.rename(target)
-        return target
+    print target
+    return target
 
 
 def run(cmd):

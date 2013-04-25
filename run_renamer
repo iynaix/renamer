@@ -2,4 +2,4 @@
 
 cd ~/projects/renamer/
 source env/bin/activate
-python auto_rename.py --notify
+# python auto_rename.py --notify
