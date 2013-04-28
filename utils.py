@@ -92,20 +92,25 @@ def rename_episode(renamed):
     #probably a youtube / vimeo video
     if "episodeNumber" not in info or "series" not in info:
         return renamed
-    return "%(series)s S%(season)02dE%(episodeNumber)02d" % info
+
+    try:
+        return "%(series)s S%(season)02dE%(episodeNumber)02d" % info
+    except KeyError:
+        return renamed
 
 
 def rename(fp, dry_run=False):
     """
-    renames the file intelligently
+    renames the file / folder intelligently
     dry_run determines if the actual rename is performed
     """
-
-    #file extension
-    ext = fp.ext.lower()
-    #do not touch files that might be downloaded
-    if ext == ".rar" or ext == ".part":
-        return
+    if not fp.isdir():
+        #file extension
+        ext = fp.ext.lower()
+        #do not touch files that might be downloaded
+        IGNORE_EXTS = (".rar", ".part", ".iso")
+        if ext in IGNORE_EXTS:
+            return
 
     name = fp.namebase
     renamed = name.strip().replace("!", '').strip("_ ").strip(".")
@@ -143,7 +148,10 @@ def rename(fp, dry_run=False):
     # renamed = renamed.replace("Chihayafuru 2", "Chihayafuru S2")
 
     #print and rename output if unchanged
-    target = fp.dirname().joinpath(renamed + ext)
+    if fp.isdir():
+        target = fp.dirname().joinpath(renamed)
+    else:
+        target = fp.dirname().joinpath(renamed + ext)
     if renamed != name:
         print "%s => " % name,
         puts(colored.green(renamed))

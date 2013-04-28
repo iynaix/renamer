@@ -20,8 +20,8 @@ if __name__ == "__main__":
     -h --help     Show this screen.
     --version     Show version.
     --debug       Debug mode, no files are actually renamed.
-
     """
+
     args = docopt(doc, version='Renamer 1.0 Beta')
     DEBUG = args["--debug"]
 

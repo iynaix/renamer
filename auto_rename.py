@@ -21,27 +21,43 @@ def smart_move_file(fname, video_dirs, dry_run=False):
             move_file(fname, v)
 
 
-def move_300mbunited(dry_run=False):
+def move_movies(dry_run=False):
     """
     handle movies downloaded from 300mbunited, renaming them and moving them to
     the movies folder
     """
+    movie_dirs = []
     for d in DOWNLOAD_DIR.dirs():
         if d.name.startswith("_FAILED"):
             continue
 
         #look for any movie directories
-        if "300mbunited" in d.lower():
-            #look for the mkvs
-            for f in d.files():
-                if f.endswith(".mkv"):
-                    #move the file over
-                    fp = rename(f, dry_run)
-                    move_file(fp, HOME_DIR("Videos/Movies"), dry_run)
-                    break
-            #remove the directory
-            if not dry_run:
-                d.rmtree()
+        #it shouldn't have many files
+        file_count = len(d.listdir())
+        if file_count > 10 or file_count == 0:
+            continue
+
+        #look at the distribution of file sizes
+        file_sizes = [f.size for f in d.files()]
+        total_file_sizes = sum(file_sizes)
+
+        file_size_dist = [f.size * 1.0 / total_file_sizes for f in d.files()]
+
+        #movie files should be more than 95% of total file size
+        if sorted(file_size_dist)[-1] > 0.95:
+            movie_dirs.append(d)
+
+    for d in movie_dirs:
+        vid = sorted(d.files(), key=lambda f: f.size)[-1]
+
+        info = guessit.guess_video_info(str(vid))
+        fp = vid.rename("%s%s" % (info["title"], vid.ext))
+        move_file(fp, HOME_DIR("Videos/Movies"), dry_run)
+
+    for d in movie_dirs:
+        #remove the directory
+        if not dry_run:
+            d.rmtree()
 
 
 def move_tv_episodes(dry_run=False):
@@ -82,9 +98,9 @@ if __name__ == "__main__":
     youtube, vimeo, piratebay etc.
 
     Usage:
-    rename.py [--debug] [--notify]
-    rename.py (-h | --help)
-    rename.py --version
+    auto_rename.py [--debug] [--notify]
+    auto_rename.py (-h | --help)
+    auto_rename.py --version
 
     Options:
     -h --help     Show this screen.
@@ -101,11 +117,11 @@ if __name__ == "__main__":
     DOWNLOAD_DIR = HOME_DIR("Downloads")
     HDD_DIR = path("/media/iynaix/9b528a0a-22e7-410a-8bad-a4f52e97d407")
 
-    #handle movies downloaded from 300mbunited.
-    move_300mbunited()
-
-    #handle tv episodes downloaded from 300mbunited.
+    #handle downloaded tv episodes
     move_tv_episodes()
+
+    #handle downloaded movies
+    move_movies()
 
     #folders where the files will be renamed
     RENAME_DIRS = [
