@@ -108,7 +108,7 @@ def rename(fp, dry_run=False):
         #file extension
         ext = fp.ext.lower()
         #do not touch files that might be downloaded
-        IGNORE_EXTS = (".rar", ".part", ".iso")
+        IGNORE_EXTS = (".rar", ".part", ".iso", ".torrent", ".added")
         if ext in IGNORE_EXTS:
             return
 

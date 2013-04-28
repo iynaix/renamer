@@ -21,16 +21,31 @@ def smart_move_file(fname, video_dirs, dry_run=False):
             move_file(fname, v)
 
 
+def loop_completed_dl_dirs():
+    """
+    returns a list of directories possibly containing downloads
+    """
+    ret = []
+    ignored_dirs = ("pending", "incomplete", "TMP", "Podcasts", "Ebooks")
+    ignored_dirs = [x.lower() for x in ignored_dirs]
+
+    for d in DOWNLOAD_DIR.dirs():
+        if d.name.startswith("_FAILED"):
+            continue
+
+        if d.name.lower() in ignored_dirs:
+            continue
+
+        ret.append(d)
+    return ret
+
 def move_movies(dry_run=False):
     """
     handle movies downloaded from 300mbunited, renaming them and moving them to
     the movies folder
     """
     movie_dirs = []
-    for d in DOWNLOAD_DIR.dirs():
-        if d.name.startswith("_FAILED"):
-            continue
-
+    for d in loop_completed_dl_dirs():
         #look for any movie directories
         #it shouldn't have many files
         file_count = len(d.listdir())
@@ -51,8 +66,12 @@ def move_movies(dry_run=False):
         vid = sorted(d.files(), key=lambda f: f.size)[-1]
 
         info = guessit.guess_video_info(str(vid))
-        fp = vid.rename("%s%s" % (info["title"], vid.ext))
-        move_file(fp, HOME_DIR("Videos/Movies"), dry_run)
+        try:
+            fp = vid.rename("%s%s" % (info["title"], vid.ext))
+            move_file(fp, HOME_DIR("Videos/Movies"), dry_run)
+        #not a movie file, just bail
+        except KeyError:
+            return
 
     for d in movie_dirs:
         #remove the directory
@@ -65,10 +84,7 @@ def move_tv_episodes(dry_run=False):
     handle tv episodes downloaded by sabnzbd
     """
     episode_dirs = []
-    for d in DOWNLOAD_DIR.dirs():
-        if d.name.startswith("_FAILED"):
-            continue
-
+    for d in loop_completed_dl_dirs():
         #need to fake an extension
         info = guessit.guess_video_info(str(d)+".avi")
         if info["type"] != "episode":
